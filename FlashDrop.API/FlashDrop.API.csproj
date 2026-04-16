@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Modules\Catalog\" />
+    <Folder Include="Modules\Identity\" />
+    <Folder Include="Modules\Ordering\" />
+    <Folder Include="Shared\Behaviors\" />
+    <Folder Include="Shared\Data\" />
+    <Folder Include="Shared\Exceptions\" />
+    <Folder Include="Shared\Middleware\" />
+    <Folder Include="Shared\Services\" />
+    <Folder Include="Workers\" />
+  </ItemGroup>
+
+</Project>
