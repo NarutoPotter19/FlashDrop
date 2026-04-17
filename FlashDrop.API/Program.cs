@@ -1,4 +1,9 @@
+using FlashDrop.API.Shared.Middleware;
+
 var builder = WebApplication.CreateBuilder(args);
+
+
+
 
 // Add services to the container.
 
@@ -13,6 +18,10 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+//added a cutome Exceptional handling middle ware jsut before HTTPRedirection
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 
 app.UseHttpsRedirection();
 

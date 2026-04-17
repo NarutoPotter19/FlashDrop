@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -24,8 +24,6 @@
     <Folder Include="Modules\Ordering\" />
     <Folder Include="Shared\Behaviors\" />
     <Folder Include="Shared\Data\" />
-    <Folder Include="Shared\Exceptions\" />
-    <Folder Include="Shared\Middleware\" />
     <Folder Include="Shared\Services\" />
     <Folder Include="Workers\" />
   </ItemGroup>
