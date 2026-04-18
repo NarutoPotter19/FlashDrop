@@ -14,6 +14,7 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.12.14" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
   </ItemGroup>
@@ -22,6 +23,7 @@
     <Folder Include="Modules\Catalog\" />
     <Folder Include="Modules\Identity\" />
     <Folder Include="Modules\Ordering\" />
+    <Folder Include="logs\" />
     <Folder Include="Shared\Behaviors\" />
     <Folder Include="Shared\Data\" />
     <Folder Include="Shared\Services\" />
