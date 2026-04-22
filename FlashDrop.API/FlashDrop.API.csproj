@@ -25,7 +25,6 @@
     <Folder Include="Modules\Ordering\" />
     <Folder Include="logs\" />
     <Folder Include="Shared\Behaviors\" />
-    <Folder Include="Shared\Data\" />
     <Folder Include="Shared\Services\" />
     <Folder Include="Workers\" />
   </ItemGroup>

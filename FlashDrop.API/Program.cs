@@ -2,6 +2,9 @@ using FlashDrop.API.Shared.Middleware;
 using Serilog;
 using System;
 
+using FlashDrop.API.Shared.Data;
+using Microsoft.EntityFrameworkCore;
+
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -26,6 +29,23 @@ try
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
+
+    // AddDbContext<T> registers FlashDropDbContext in the DI container
+    // as a SCOPED service (one instance per HTTP request).
+    //
+    // options.UseNpgsql(...) tells EF Core to use the Npgsql PostgreSQL
+    // provider (from the Npgsql.EntityFrameworkCore.PostgreSQL NuGet package).
+    //
+    // GetConnectionString("DefaultConnection") reads from appsettings.json:
+    //   "ConnectionStrings": {
+    //     "DefaultConnection": "Host=localhost;Port=5432;Database=flashdrop;..."
+    //   }
+    //
+
+    builder.Services.AddDbContext<FlashDropDbContext>(options=>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+        ));
 
 
     var app = builder.Build();
