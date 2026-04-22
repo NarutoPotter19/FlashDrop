@@ -1,9 +1,14 @@
+using FlashDrop.API.Shared.Behaviors;
+using FlashDrop.API.Shared.Data;
 using FlashDrop.API.Shared.Middleware;
+using FluentValidation;      //AddValidatorsFromAssemblyContaining
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection; 
 using Serilog;
 using System;
-
-using FlashDrop.API.Shared.Data;
-using Microsoft.EntityFrameworkCore;
+using System.Reflection;// Assembly.GetExecutingAssembly()
+using AutoMapper;
 
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
 Log.Logger = new LoggerConfiguration()
@@ -42,10 +47,31 @@ try
     //   }
     //
 
-    builder.Services.AddDbContext<FlashDropDbContext>(options=>
+    builder.Services.AddDbContext<FlashDropDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection")
         ));
+
+
+    //registering MediaTR
+
+    // RegisterServicesFromAssembly scans the project's compiled assembly
+    // and auto-registers every class that implements IRequestHandler<,>.
+    // After this, ISender.Send(new SomeCommand()) will find SomeCommandHandler
+    // automatically — no manual registration per handler needed.
+
+    builder.Services.AddMediatR(cfg
+        => cfg.RegisterServicesFromAssembly(
+            Assembly.GetExecutingAssembly()));
+
+    builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
+
+    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+
+    builder.Services.AddTransient(                                     // [+]
+    typeof(IPipelineBehavior<,>),                                  // [+]
+    typeof(ValidationBehavior<,>));
 
 
     var app = builder.Build();

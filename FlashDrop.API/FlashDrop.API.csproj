@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="16.1.1" />
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="11.0.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="MediatR" Version="14.1.0" />
@@ -24,7 +25,6 @@
     <Folder Include="Modules\Identity\" />
     <Folder Include="Modules\Ordering\" />
     <Folder Include="logs\" />
-    <Folder Include="Shared\Behaviors\" />
     <Folder Include="Shared\Services\" />
     <Folder Include="Workers\" />
   </ItemGroup>
