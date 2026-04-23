@@ -10,6 +10,8 @@ using System;
 using System.Reflection;// Assembly.GetExecutingAssembly()
 using AutoMapper;
 
+using StackExchange.Redis;// for — IConnectionMultiplexer, ConnectionMultiplexer
+
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -69,9 +71,31 @@ try
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 
-    builder.Services.AddTransient(                                     // [+]
-    typeof(IPipelineBehavior<,>),                                  // [+]
+    builder.Services.AddTransient(                                      
+    typeof(IPipelineBehavior<,>),                                  
     typeof(ValidationBehavior<,>));
+
+
+
+    // ConnectionMultiplexer is the StackExchange.Redis client.
+    // It manages a persistent pool of connections to Redis.
+    //
+    // MUST be Singleton: ConnectionMultiplexer is thread-safe and designed
+    // to be shared across all requests. Creating a new one per request
+    // (Scoped/Transient) creates a new TCP connection per request,
+    // exhausting Redis connection limits almost instantly.
+    //
+    // .Connect() is called at app startup (during builder.Build()).
+    // This means: if Redis is NOT running when you start the .NET app,
+    // you get a RedisConnectionException immediately.
+    // Solution: always run "docker compose up -d" before "dotnet run".
+    //
+    // The ! (null-forgiving operator) tells the compiler we guarantee
+    // the connection string exists at runtime (we set it in appsettings.json).
+
+    var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+
+    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!)); 
 
 
     var app = builder.Build();

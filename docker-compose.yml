@@ -1,0 +1,35 @@
+# FlashDrop API — Docker Compose Infrastructure
+# Prompt 9:  Redis added
+# Prompt 29: RabbitMQ will be added here
+# Prompt 50: PostgreSQL + API container will be added here (final master file)
+
+# 'version' is technically optional in Compose v2, but included for clarity
+version: '3.8'
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # REDIS — In-memory cache for Product Catalog
+  # Used by: ICacheService (Prompt 18) → GetProductByIdQuery (Prompt 21)
+  # ──────────────────────────────────────────────────────────
+  redis:
+    # image: redis:7-alpine
+    # Redis version 7, Alpine Linux base image.
+    # Alpine = ~10MB vs full Redis ~80MB. Same functionality, much smaller.
+    image: redis:7-alpine
+
+    # Container name override — makes "docker ps" output readable.
+    # Without this, Docker auto-generates names like "flashdrop-redis-1"
+    container_name: flashdrop-redis
+
+    # ports: maps HOST_PORT:CONTAINER_PORT
+    # "6379:6379" means:
+    #   Your machine's port 6379 → forwards to → Container's port 6379
+    # Your .NET app connects to localhost:6379 and Docker handles routing.
+    ports:
+      - "6379:6379"
+
+    # restart: unless-stopped
+    # If Redis container crashes, Docker automatically restarts it.
+    # Stops ONLY if you explicitly run "docker compose down" or "docker stop".
+    restart: unless-stopped
