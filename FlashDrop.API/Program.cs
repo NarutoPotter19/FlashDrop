@@ -11,6 +11,7 @@ using Serilog;
 using StackExchange.Redis;// for — IConnectionMultiplexer, ConnectionMultiplexer
 using System;
 using System.Reflection;// Assembly.GetExecutingAssembly()
+using FlashDrop.API.Modules.Identity.Services;// for using Identity serivices we have created  IJwtProvider, JwtProvider
 
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
 Log.Logger = new LoggerConfiguration()
@@ -118,6 +119,28 @@ try
     builder.Services.Configure<JwtSettings>(
     builder.Configuration.GetSection("JwtSettings"));
 
+
+
+    // Register IJwtProvider interface → JwtProvider concrete class.
+    // Lifetime: Scoped (one instance per HTTP request).
+
+    // Why Scoped?
+//   JwtProvider is request-bound work (generate a token for this specific login).
+//   It reads IOptions<JwtSettings> (which is already a singleton — safe to inject
+//   into scoped services). No shared mutable state, so scoped is appropriate.
+//
+// How it's used:
+//   AuthController.Login  will inject IJwtProvider and call
+//   GenerateToken(user) after credential verification, returning the token to client.
+    builder.Services.AddScoped<IJwtProvider, JwtProvider>();
+
+
+
+
+
+
+
+
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
@@ -134,6 +157,7 @@ try
     app.UseHttpsRedirection();
     app.UseAuthorization();
     app.MapControllers();
+
 
     app.Run();
 }
