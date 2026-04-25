@@ -1,3 +1,5 @@
+﻿using AutoMapper;
+using FlashDrop.API.Modules.Identity;
 using FlashDrop.API.Shared.Behaviors;
 using FlashDrop.API.Shared.Data;
 using FlashDrop.API.Shared.Middleware;
@@ -6,11 +8,9 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection; 
 using Serilog;
+using StackExchange.Redis;// for — IConnectionMultiplexer, ConnectionMultiplexer
 using System;
 using System.Reflection;// Assembly.GetExecutingAssembly()
-using AutoMapper;
-
-using StackExchange.Redis;// for � IConnectionMultiplexer, ConnectionMultiplexer
 
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
 Log.Logger = new LoggerConfiguration()
@@ -60,7 +60,7 @@ try
     // RegisterServicesFromAssembly scans the project's compiled assembly
     // and auto-registers every class that implements IRequestHandler<,>.
     // After this, ISender.Send(new SomeCommand()) will find SomeCommandHandler
-    // automatically � no manual registration per handler needed.
+    // automatically — no manual registration per handler needed.
 
     builder.Services.AddMediatR(cfg
         => cfg.RegisterServicesFromAssembly(
@@ -95,16 +95,35 @@ try
 
     var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
 
-    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!)); 
+    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString!));
 
+
+
+
+
+
+    //i m Binding  the "JwtSettings" section from appsettings.json
+    // to the JwtSettings record using the Options pattern.
+    //
+    // This single call registers IOptions<JwtSettings> in the DI container.
+    // Any class that needs JWT config can now inject IOptions<JwtSettings>
+    // and read .Value to get a fully-populated, type-safe JwtSettings object.
+    //
+    // Why GetSection("JwtSettings")?
+    //   → It tells the binder to look at ONLY the JwtSettings sub-section,
+    //     not the entire appsettings.json root. The keys within that section
+    //     ("Secret", "Issuer", "Audience", "ExpiryMinutes") are matched to
+    //     the record's property names case-insensitively.
+
+    builder.Services.Configure<JwtSettings>(
+    builder.Configuration.GetSection("JwtSettings"));
 
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
 
-    // ==========================================
-    // PROMPT 6 TO 50: ADD ALL MIDDLEWARE HERE
-    // ==========================================
+   //ADDING ALL MIDDLEWARE HERE
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
