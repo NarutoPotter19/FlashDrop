@@ -5,16 +5,18 @@ using FlashDrop.API.Shared.Behaviors;
 using FlashDrop.API.Shared.Data;
 using FlashDrop.API.Shared.Middleware;
 using FluentValidation;      //AddValidatorsFromAssemblyContaining
-using MediatR;
-// Required for JwtBearerDefaults.AuthenticationScheme constant
+using MediatR; // Required for JwtBearerDefaults.AuthenticationScheme constant
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection; 
 using Microsoft.IdentityModel.Tokens;// Required for TokenValidationParameters and SymmetricSecurityKey
+using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models; // — OpenApiSecurityScheme etc.
 using Microsoft.Win32;
 using Serilog;
 using StackExchange.Redis;// for — IConnectionMultiplexer, ConnectionMultiplexer
 using System;
+using System.Net;
 using System.Reflection;
 using System.Text;// Assembly.GetExecutingAssembly()
 
@@ -43,7 +45,85 @@ try
     // ==========================================
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+
+
+    //builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        // Telling  Swagger a security scheme named "Bearer" exists.
+        // This creates the "Authorize" button in Swagger UI and the
+        // text field where users paste their JWT token.
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+
+            // Name: the HTTP header that carries the token
+            Name = "Authorization",
+
+            //Type.Http: This is an HTTP header scheme (as opposed to
+            //     OAuth2 which has its own type). For JWT Bearer, use Http.
+            Type = SecuritySchemeType.Http,
+
+            //     Scheme "bearer": tells Swagger the prefix is "Bearer ".
+            //     Note: lowercase "bearer" here is correct per OpenAPI spec.
+            //     Swagger UI will prepend "Bearer " automatically —
+            //     you only paste the raw token, NOT "Bearer eyJ..."
+            Scheme = "bearer",
+
+            //earerFormat "JWT": documentation only — tells API consumers
+            //     the format of the token. Has no effect on validation.
+            BearerFormat = "JWT",
+
+            // In: the token is in the request Header(not query string / cookie)
+            In = ParameterLocation.Header,
+
+            //Description: shown to users inside the Swagger UI dialog box
+            Description = "Enter your JWT token below.\n\n" +
+            "Get a token: POST /api/auth/login\n" + "Example value: eyJhbGciOiJIUzI1NiIs..."
+        });
+
+
+
+
+        //Step 2: Apply the Bearer scheme globally.
+        //
+        // OpenApiSecurityRequirement is a dictionary where:
+        //   KEY   = the security scheme reference
+        //   VALUE = list of required scopes (empty for Bearer/JWT — scopes are OAuth2 only)
+        //
+        // This marks ALL endpoints in Swagger UI as requiring auth.
+        // IMPORTANT: This is Swagger UI behaviour only. The actual enforcement
+        // of authentication on each endpoint is done by [Authorize] attributes
+        // + the JWT middleware registered in Program.cs (Prompt 13).
+        // Endpoints WITHOUT [Authorize] still work without a token at runtime.
+
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme                               // [+]
+            {                                                        // [+]
+                Reference = new OpenApiReference                    // [+]
+                {                                                    // [+]
+                    // [+] ReferenceType.SecurityScheme: we are referencing
+                    //     a security scheme (not a path, component, etc.)
+                    Type = ReferenceType.SecurityScheme,            // [+]
+                                                                    // [+]
+                    // [+] Id "Bearer": MUST exactly match the name used in
+                    //     AddSecurityDefinition above. Case-sensitive.
+                    Id = "Bearer"                                   // [+]
+                }                                                    // [+]
+            },
+                Array.Empty<string>() // No scopes required for Bearer/JWT
+            }
+        });
+
+
+
+
+    }
+        );
+
+
+
 
     // AddDbContext<T> registers FlashDropDbContext in the DI container
     // as a SCOPED service (one instance per HTTP request).
@@ -262,10 +342,10 @@ try
     app.MapControllers();
 
 
-    // TEMPORARY — DELETE AFTER TESTING
-    app.MapGet("/test-auth", [Microsoft.AspNetCore.Authorization.Authorize] () =>
-        "You are authenticated!")
-       .WithName("TestAuth");
+    //// TEMPORARY — DELETE AFTER TESTING reesponse should be 401 unauthorise d
+    //app.MapGet("/test-auth", [Microsoft.AspNetCore.Authorization.Authorize] () =>
+    //    "You are authenticated!")
+    //   .WithName("TestAuth");
 
 
     app.Run();
