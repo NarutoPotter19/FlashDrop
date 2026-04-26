@@ -29,7 +29,7 @@ namespace FlashDrop.API.Modules.Identity
         // Used in  (login). Injected now so the constructor
         // is complete — adding it later would require modifying the constructor.
 
-        private readonly IJwtProvider? jwtProvider;
+        private readonly IJwtProvider? _jwtProvider;
 
 
         //Constructor injection:
@@ -42,7 +42,7 @@ namespace FlashDrop.API.Modules.Identity
         public AuthController(FlashDropDbContext? context, IJwtProvider? jwtProvider)
         {
             _context = context;
-            this.jwtProvider = jwtProvider;
+            this._jwtProvider = jwtProvider;
 
         }
 
@@ -139,7 +139,7 @@ namespace FlashDrop.API.Modules.Identity
                 
                 actionName: nameof(Register), // the name of this action method
                 //routeValues: null, // no route parameters to include in the Location header
-                value: new { id = user.Id, message = "Account created successfully." } // response body with the new user's Id
+                value: new { id = user.Id, message = "Your Account created successfully." } // response body with the new user's Id
             );
         }
 
@@ -148,6 +148,107 @@ namespace FlashDrop.API.Modules.Identity
 
 
         //we will IMplement Post/api/Login in here 
+
+        //Login Endpoint Flow:
+
+        // Finds the user by email, verifies the password, generates a JWT.
+        //
+        // Returns:
+        //   200 OK          → { token, expiresAt }
+        //   401 Unauthorized → { message } — same message for wrong email AND wrong password
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+
+            // 1. find user Email
+            //                                                               [+]
+            //  FirstOrDefaultAsync returns the user or null.
+            //  ToLower() on both sides for case-insensitive comparison.
+            //  We use FirstOrDefaultAsync (not SingleOrDefaultAsync) because:
+            //   - The unique index on Email guarantees at most ONE result
+            // - FirstOrDefaultAsync is slightly faster (stops at first match)
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
+
+
+
+
+
+            //2.Retuen 401 Unauthorized if user not found or password is incorrect not 404 ( it protects from Enumeration attack)
+            //  SECURITY: We return the SAME message whether:
+            //   a) The email doesn't exist in the database, OR
+            //    b) The password is wrong
+            // 
+            //  This prevents "email enumeration attacks" where an attacker
+            //  sends many login attempts and watches if they get different
+            //  responses for emails that exist vs. don't exist.
+            // 
+            // "Invalid email or password." deliberately doesn't say WHICH
+            //  one is wrong — the attacker learns nothing useful.
+
+            if (user == null)
+            {
+                return Unauthorized(new { message = "Invalid Email or password. " });
+            }
+
+
+
+            // 3.Verify Password
+
+            //BCrypt.Verify compares the plain-text password the user
+            //  just sent against the stored hash from the database.
+            // 
+            //  Internally, BCrypt extracts the salt from the stored hash
+            //  (it's embedded in the hash string), re-runs the hashing
+            //  with that same salt, and compares the results.
+            // 
+            //  BCrypt.Verify is TIMING-SAFE — it takes the same time
+            //  whether the password is correct or not. This prevents
+            //  "timing attacks" where an attacker measures response time
+            //  to infer password characters.
+            var IsPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+
+            if (IsPasswordValid == false)
+            {
+                return Unauthorized(new { message = "Invalid Email or Password." });
+            }
+
+
+
+
+
+            //4. Genrate JWT TOken
+
+            var token = _jwtProvider.GenerateToken(user);
+
+
+
+
+            //5.Build Expireay Timestamp
+
+            //  We compute ExpiresAt here so the client gets it explicitly.
+            //  This must match the exp claim embedded in the token.
+            // ExpiryMinutes comes from JwtSettings (appsettings.json: 60).
+            //
+            // NOTE: If your JwtSettings class exposes ExpiryMinutes,
+            //  you can inject IOptions<JwtSettings> here. For simplicity
+            // we hardcode the lookup — or you can expose it via the provider.
+            //  The cleanest approach: have GenerateToken return a tuple or object.
+            //  For this project, we compute it from configuration directly.
+            var jwtSettings = HttpContext.RequestServices
+           .GetRequiredService<Microsoft.Extensions.Options.IOptions<JwtSettings>>()
+           .Value;
+            var expiresAt = DateTime.UtcNow.AddMinutes(jwtSettings.ExpiryMinutes);
+
+
+
+            //Last if eveything is good till here then return 200 Ok with the token
+
+            return Ok(new LoginResponse(token, expiresAt));
+        }
+
+
 
 
     }
