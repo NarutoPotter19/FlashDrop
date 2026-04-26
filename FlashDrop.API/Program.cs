@@ -1,17 +1,24 @@
 ﻿using AutoMapper;
 using FlashDrop.API.Modules.Identity;
+using FlashDrop.API.Modules.Identity.Services;// for using Identity serivices we have created  IJwtProvider, JwtProvider
 using FlashDrop.API.Shared.Behaviors;
 using FlashDrop.API.Shared.Data;
 using FlashDrop.API.Shared.Middleware;
 using FluentValidation;      //AddValidatorsFromAssemblyContaining
 using MediatR;
+// Required for JwtBearerDefaults.AuthenticationScheme constant
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection; 
+using Microsoft.IdentityModel.Tokens;// Required for TokenValidationParameters and SymmetricSecurityKey
+using Microsoft.Win32;
 using Serilog;
 using StackExchange.Redis;// for — IConnectionMultiplexer, ConnectionMultiplexer
 using System;
-using System.Reflection;// Assembly.GetExecutingAssembly()
-using FlashDrop.API.Modules.Identity.Services;// for using Identity serivices we have created  IJwtProvider, JwtProvider
+using System.Reflection;
+using System.Text;// Assembly.GetExecutingAssembly()
+
+
 
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
 Log.Logger = new LoggerConfiguration()
@@ -125,14 +132,96 @@ try
     // Lifetime: Scoped (one instance per HTTP request).
 
     // Why Scoped?
-//   JwtProvider is request-bound work (generate a token for this specific login).
-//   It reads IOptions<JwtSettings> (which is already a singleton — safe to inject
-//   into scoped services). No shared mutable state, so scoped is appropriate.
-//
-// How it's used:
-//   AuthController.Login  will inject IJwtProvider and call
-//   GenerateToken(user) after credential verification, returning the token to client.
+    //   JwtProvider is request-bound work (generate a token for this specific login).
+    //   It reads IOptions<JwtSettings> (which is already a singleton — safe to inject
+    //   into scoped services). No shared mutable state, so scoped is appropriate.
+    //
+    // How it's used:
+    //   AuthController.Login  will inject IJwtProvider and call
+    //   GenerateToken(user) after credential verification, returning the token to client.
     builder.Services.AddScoped<IJwtProvider, JwtProvider>();
+
+
+    // Register the JWT Bearer authentication handler.
+    //
+    // What this does:
+    //   1. Sets the DEFAULT authentication scheme to "Bearer"
+    //      → When a request arrives, ASP.NET Core looks for "Authorization: Bearer <token>"
+    //   2. Registers the JWT Bearer handler that knows how to read + validate JWT tokens
+    //   3. Configures TokenValidationParameters — the RULES for what makes a token valid
+    //
+    // Note: We re-read JwtSettings here via GetSection().Get<>() instead of injecting
+    // IOptions<JwtSettings>, because builder.Services.Add... runs BEFORE the DI container
+    // is built. IOptions<T> is only available AFTER app.Build(). GetSection().Get<>()
+    // reads from configuration directly, which is always available on the builder.
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    {
+
+        //Register the JWT Bearer authentication handler.
+//
+// What this does:
+//   1. Sets the DEFAULT authentication scheme to "Bearer"
+//      → When a request arrives, ASP.NET Core looks for "Authorization: Bearer <token>"
+//   2. Registers the JWT Bearer handler that knows how to read + validate JWT tokens
+//   3. Configures TokenValidationParameters — the RULES for what makes a token valid
+//
+// Note: We re-read JwtSettings here via GetSection().Get<>() instead of injecting
+// IOptions<JwtSettings>, because builder.Services.Add... runs BEFORE the DI container
+// is built. IOptions<T> is only available AFTER app.Build(). GetSection().Get<>()
+// reads from configuration directly, which is always available on the builder.
+
+        var jwtSettings =builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()!;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+
+            // Checks that the token's "iss" claim matches our configured issuer.
+            // Prevents tokens issued by other APIs from being accepted here.
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+
+            // Checks that the token's "aud" claim matches our configured audience.
+            // Prevents cross-service token misuse.
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+
+            // Checks that the current UTC time is BEFORE the token's "exp" claim.
+            // Expired tokens are rejected even if everything else is valid.
+            ValidateLifetime = true,
+
+
+
+            //VALIDATE SIGNING KEY
+            // Verifies the HMAC-SHA256 signature using our secret key.
+            // If a token was tampered with (payload modified), the signature
+            // won't match and the token is rejected.
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                                           Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+
+
+
+            // CLOCK SKEW = ZERO
+            // By default, JWT validation allows a 5-minute grace period after expiry
+            // to handle clock drift between servers.
+            // Setting this to Zero means tokens expire exactly at their "exp" timestamp.
+            // For FlashDrop (a flash-sale app), exact timing matters.
+
+            ClockSkew = TimeSpan.Zero,
+
+
+
+
+
+        };
+
+
+
+
+    });
+
+
 
 
 
@@ -155,8 +244,28 @@ try
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseHttpsRedirection();
+
+    //: UseRouting() must be called explicitly before UseAuthentication.
+    // In .NET 9 this is called implicitly, but being explicit ensures correct ordering
+    // and avoids subtle bugs when middleware is added/reordered in future prompts.
+    // UseRouting matches the incoming request URL to an endpoint (controller action).
+    app.UseRouting();
+  //UseAuthentication() — reads the "Authorization: Bearer <token>"
+// header, validates the JWT using TokenValidationParameters (configured above),
+// and if valid, populates HttpContext.User with the token's claims.
+    app.UseAuthentication();
+
+
+
+
     app.UseAuthorization();
     app.MapControllers();
+
+
+    // TEMPORARY — DELETE AFTER TESTING
+    app.MapGet("/test-auth", [Microsoft.AspNetCore.Authorization.Authorize] () =>
+        "You are authenticated!")
+       .WithName("TestAuth");
 
 
     app.Run();
