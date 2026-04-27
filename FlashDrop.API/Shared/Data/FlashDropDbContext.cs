@@ -4,6 +4,7 @@ using System.Collections.Generic;
 
 
 using FlashDrop.API.Modules.Identity;
+using FlashDrop.API.Modules.Catalog;// for the  Product type we have cewated in Catalog module
 
 
 namespace FlashDrop.API.Shared.Data
@@ -24,6 +25,17 @@ namespace FlashDrop.API.Shared.Data
         //   2. The "Users" table maps to the AppUser C# class
         //   3. context.Users gives access to all CRUD operations on this table
         public DbSet<AppUser> Users { get; set; }
+
+        //— DbSet<Product>
+        //
+        // Maps to the "Products" table in PostgreSQL.
+        // All CRUD operations on products go through context.Products:
+        //   context.Products.Add(product)         → INSERT
+        //   context.Products.ToListAsync()         → SELECT *
+        //   context.Products.FindAsync(id)         → SELECT WHERE Id = @id
+        //   context.Products.Remove(product)       → DELETE (we never do this — IsActive instead)
+
+        public DbSet<Product> Products { get; set; }
 
         public FlashDropDbContext(DbContextOptions options) : base(options)
         {
@@ -80,6 +92,48 @@ namespace FlashDrop.API.Shared.Data
             modelBuilder.Entity<AppUser>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+
+
+
+
+            //— Product SKU unique index
+            //
+            // Every product has a unique SKU (Stock Keeping Unit).
+            // This index enforces that uniqueness at the database level.
+            //
+            // Generated SQL (runs in Prompt 25 migration):
+            //   CREATE UNIQUE INDEX "IX_Products_SKU" ON "Products" ("SKU");
+            //
+            // Benefits:
+            //   1. Database rejects duplicate SKUs — no duplicate products
+            //   2. Lookup by SKU is O(log n) — fast even at millions of rows
+
+
+
+            modelBuilder.Entity<Product>()                             
+            .HasIndex(p => p.SKU)                                 
+            .IsUnique();
+
+
+
+            //— Product Price column type
+            //
+            // Without this configuration, EF Core maps C# decimal to
+            // PostgreSQL 'numeric' with no precision specified.
+            // That works, but being explicit about decimal(18,2) is:
+            //   - Clearer for anyone reading the schema
+            //   - Consistent with SQL Server convention (common in .NET)
+            //   - Ensures 2 decimal places maximum (cents precision)
+            //
+            // decimal(18,2) means:
+            //   18 = total significant digits
+            //    2 = digits after the decimal point (cents)
+            // Max storable price: 9,999,999,999,999,999.99
+
+            modelBuilder.Entity<Product>()                            
+           .Property(p => p.Price)                                
+           .HasColumnType("decimal(18,2)");
         }
     }
 }

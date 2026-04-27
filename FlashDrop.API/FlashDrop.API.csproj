@@ -23,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Modules\Catalog\" />
     <Folder Include="Modules\Ordering\" />
     <Folder Include="logs\" />
     <Folder Include="Shared\Services\" />
