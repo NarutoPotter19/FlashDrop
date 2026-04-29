@@ -19,6 +19,7 @@ using System;
 using System.Net;
 using System.Reflection;
 using System.Text;// Assembly.GetExecutingAssembly()
+using FlashDrop.API.Shared.Services;//we are going to use IChace service and RedisCacheService in our program.cs to register them in DI container
 
 
 
@@ -187,6 +188,9 @@ try
 
 
 
+    builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+
+
 
 
 
@@ -346,6 +350,16 @@ try
     //app.MapGet("/test-auth", [Microsoft.AspNetCore.Authorization.Authorize] () =>
     //    "You are authenticated!")
     //   .WithName("TestAuth");
+
+    // TEMPORARY TEST — delete after verifying, before git commit
+    app.MapGet("/test-cache", async (ICacheService cache) =>
+    {
+        // Write to cache
+        await cache.SetAsync("test-key", new { Name = "CacheTest", Value = 42 }, TimeSpan.FromMinutes(1));
+        // Read from cache
+        var result = await cache.GetAsync<object>("test-key");
+        return Results.Ok(result);
+    });
 
 
     app.Run();
