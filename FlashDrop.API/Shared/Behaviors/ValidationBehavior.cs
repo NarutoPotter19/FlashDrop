@@ -14,7 +14,7 @@ namespace FlashDrop.API.Shared.Behaviors
 
 
 
-    //alidationBehavior is an open generic class.
+    //ValidationBehavior is an open generic class.
     // The <TRequest, TResponse> means it will be applied to EVERY
     // Command/Query that flows through MediatR — we register it once
     // and it covers everything automatically.
@@ -101,9 +101,7 @@ namespace FlashDrop.API.Shared.Behaviors
 
 
 
-        public async Task<TResponse> Handle(
-        TRequest request,
-        RequestHandlerDelegate<TResponse> next,
+        public async Task<TResponse> Handle(TRequest request,RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
         {
             //Task: STEP 1 — If no validators exist for this request,
