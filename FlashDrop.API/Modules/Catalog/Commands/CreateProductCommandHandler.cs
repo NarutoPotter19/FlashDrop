@@ -17,7 +17,7 @@ namespace FlashDrop.API.Modules.Catalog.Commands
     // Registered as Transient by default — new instance per request (correct).
     public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, ProductDto>
     {
-       
+
 
         private readonly FlashDropDbContext _dbContext;
         private readonly IMapper _mapper;
@@ -86,7 +86,7 @@ namespace FlashDrop.API.Modules.Catalog.Commands
             // Its Id is the Guid generated in BaseEntity's constructor,
             // and CreatedAt is the UTC timestamp from that constructor.
             //
-            
+
             var productDto = _mapper.Map<ProductDto>(product);
             return productDto;//// This returns the ProductDto that the controller will serialize
                               // to JSON and send back to the client as HTTP 201.
@@ -97,3 +97,4 @@ namespace FlashDrop.API.Modules.Catalog.Commands
 
         }
     }
+}

@@ -59,11 +59,11 @@ namespace FlashDrop.API.Modules.Catalog.Commands
 
     public class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
     {
-       
+
         public CreateProductCommandValidator()
         {
             // Name validation
-            RuleFor(x=>x.Name)
+            RuleFor(x => x.Name)
                 .NotEmpty()
                 .WithMessage("Name is Required")
                 .MaximumLength(20)
@@ -72,7 +72,7 @@ namespace FlashDrop.API.Modules.Catalog.Commands
 
             //Sku validation
 
-            RuleFor(x=>x.SKU)
+            RuleFor(x => x.SKU)
                 .NotEmpty()
                 .WithMessage("SKU is Required")
                 .MaximumLength(30)
@@ -83,7 +83,7 @@ namespace FlashDrop.API.Modules.Catalog.Commands
 
 
 
-            RuleFor(x=>x.Price)
+            RuleFor(x => x.Price)
                 .GreaterThan(0)
                 .WithMessage("Price can not be negative or zero");
 
