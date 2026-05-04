@@ -21,7 +21,7 @@
         //   - JSON serializers serialize all IEnumerable<T> as arrays
         //   - Liskov Substitution: code consuming PagedResponse<T> only needs to iterate
 
-      public IEnumerable<T> Data = Enumerable.Empty<T>();
+        public IEnumerable<T> Data { get; set; } = Enumerable.Empty<T>();
 
 
 
@@ -29,7 +29,7 @@
         //2. PageNumber: WHich page the client requensted( 1th Indexing)
         //// Page 1 = first page. Page 0 or negative = invalid (validated in handler).
         ///
-       public int PageNumber { get; set; }
+        public int PageNumber { get; set; }
 
         // 3. PageSize: How many items per page the client requested.
         // PageSize 0 or negative = invalid (validated in handler).
@@ -57,7 +57,7 @@
 
    // ── COMPUTED PROPERTIES (derived, read-only, no setter)
         public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
-        public bool HasNextPage=>PageNumber>TotalPages;
+        public bool HasNextPage=>PageNumber<TotalPages;
         public bool HasPreviousPage => PageNumber > 1;
 
 

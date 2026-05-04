@@ -2,7 +2,7 @@
 using FlashDrop.API.Modules.Identity;
 using FlashDrop.API.Modules.Identity.Services;// for using Identity serivices we have created  IJwtProvider, JwtProvider
 using FlashDrop.API.Shared.Behaviors;
-using FlashDrop.API.Shared.Data;
+
 using FlashDrop.API.Shared.Middleware;
 using FluentValidation;      //AddValidatorsFromAssemblyContaining
 using MediatR; // Required for JwtBearerDefaults.AuthenticationScheme constant
@@ -20,6 +20,8 @@ using System.Net;
 using System.Reflection;
 using System.Text;// Assembly.GetExecutingAssembly()
 using FlashDrop.API.Shared.Services;//we are going to use IChace service and RedisCacheService in our program.cs to register them in DI container
+
+using FlashDrop.API.Shared.Data;// for databse seeder abd flashdbcontext which we going to register in here for database seeding at startup of the APPLICATION
 
 
 
@@ -156,6 +158,7 @@ try
             Assembly.GetExecutingAssembly()));
 
     builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
+  
 
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
@@ -346,7 +349,22 @@ try
     app.MapControllers();
 
 
-    //// TEMPORARY — DELETE AFTER TESTING reesponse should be 401 unauthorise d
+    //Run DatabaseSeeder at startup
+
+    // WHY here? The seeder needs the DI container (app.Services) to
+    // resolve FlashDropDbContext. The container is only ready after
+    // app.Build() completes. And seeding must complete before the
+    // app starts accepting HTTP requests.
+    //
+    // await: seeding is async (EF Core calls). We must await it to
+    // ensure seeding finishes before the HTTP server starts.
+    // Using 'await' requires the top-level code to be async-capabl
+
+    await DatabaseSeeder.SeedAsync(app.Services);
+
+
+    ////Testing :
+    ///TEMPORARY — DELETE AFTER TESTING reesponse should be 401 unauthorise d
     //app.MapGet("/test-auth", [Microsoft.AspNetCore.Authorization.Authorize] () =>
     //    "You are authenticated!")
     //   .WithName("TestAuth");
