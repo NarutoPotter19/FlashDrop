@@ -27,7 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Modules\Ordering\" />
     <Folder Include="logs\" />
     <Folder Include="Workers\" />
   </ItemGroup>

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 ////   Microsoft.EntityFrameworkCore → DbContext, DbContextOptions, ModelBuilder
 
 
-using FlashDrop.API.Modules.Identity;
+using FlashDrop.API.Modules.Identity;//for the user table use in the identity
 using FlashDrop.API.Modules.Catalog;// for the  Product type we have cewated in Catalog module
+using FlashDrop.API.Modules.Ordering;// for new module which we have crared that is order mudulae
 
 
 namespace FlashDrop.API.Shared.Data
@@ -37,11 +38,15 @@ namespace FlashDrop.API.Shared.Data
 
         public DbSet<Product> Products { get; set; }
 
+
+        //Maps to "Orders" table in PostgreSQL.
+        public DbSet<Order> Orders { get; set; }
+
         public FlashDropDbContext(DbContextOptions options) : base(options)
         {
 
 
-                 //onstructor receives DbContextOptions from DI.
+                 //Constructor receives DbContextOptions from DI.
                  // When we call AddDbContext<FlashDropDbContext>(...) in Program.cs,
                  // EF Core builds a DbContextOptions object containing:
                  //   - The database provider (Npgsql / PostgreSQL)
@@ -134,6 +139,16 @@ namespace FlashDrop.API.Shared.Data
             modelBuilder.Entity<Product>()                            
            .Property(p => p.Price)                                
            .HasColumnType("decimal(18,2)");
+
+
+            // decimal(18,2): exact monetary storage.
+            // 18 total digits, 2 after decimal point.
+            // Max value: 9,999,999,999,999,999.99
+            // This is the purchase-time price snapshot (Product.Price × Quantity).
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.TotalPrice)
+                .HasColumnType("decimal(18,2)");
         }
     }
 }
