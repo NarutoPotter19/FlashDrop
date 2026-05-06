@@ -9,6 +9,13 @@ using Microsoft.AspNetCore.Http;                // for IHttpContextAccessor to a
 using Microsoft.EntityFrameworkCore;                // for EF Core extension methods like FirstOrDefaultAsync, SaveChangesAsync, etc.
 using System.Security.Claims;//for (claim Principle) but here  claimTypes.NameIdentifier to get the user id from the token in the checkout handler
 
+using FlashDrop.API.Modules.Ordering.Events;//fro fetching creATED eVENT DEATILS 
+using FlashDrop.API.Shared.Services;// we are going to be using IEventBus and RabbitMQEventBus in this 
+using Microsoft.Extensions.Logging;                                // [+] ADDED: Prompt 34 — ILogger<T>
+
+
+
+
 namespace FlashDrop.API.Modules.Ordering.Commands
 {
 
@@ -49,6 +56,11 @@ namespace FlashDrop.API.Modules.Ordering.Commands
         private readonly IHttpContextAccessor _httpContextAccessor;
 
 
+        private readonly IEventBus _eventBus;
+
+        private readonly ILogger<CheckoutCommandHandler> _logger;
+
+
 
 
 
@@ -58,11 +70,13 @@ namespace FlashDrop.API.Modules.Ordering.Commands
             _dbContext = dbContext;
             _mapper = mapper;
             _httpContextAccessor = httpContextAccessor;
+            _eventBus = eventBus;                                    
+            _logger = logger;
         }
 
 
 
-        public async Task<OrderDto> Handle(CheckoutCommand command, CancellationToken cancellationToken)
+        public async Task<OrderDto> Handle(CheckoutCommand command, CancellationToken cancellationToken,ILogger logger,IEventBus eventBus)
         {
             // // ── STEP 1: Extract UserId from JWT claims ──
 
@@ -209,7 +223,78 @@ namespace FlashDrop.API.Modules.Ordering.Commands
                 await transaction.CommitAsync(cancellationToken);
 
 
-                // // ── STEP 10: Map Order entity → OrderDto ──
+
+
+                // ── STEP 10: Publish OrderConfirmedEvent (fire-and-forget) ──
+                //This block is AFTER CommitAsync() and OUTSIDE
+                // the try/catch that has RollbackAsync in it.
+
+                //Explanation: But i would recoomend to look at Notes
+                // If this publish block were INSIDE the try block:
+                //   A publish failure would trigger catch → RollbackAsync()
+                //   But the transaction is already committed — RollbackAsync on a committed
+                //   transaction is a no-op in PostgreSQL (the data stays).
+                //   However, the exception would propagate → HTTP 500 returned to client.
+                //   Client thinks order FAILED but database says order SUCCEEDED → confusion.
+                //
+                // The CORRECT pattern: publish is best-effort, outside the transaction scope.
+                //   DB commit = correctness requirement (must succeed)
+                //   Event publish = notification (nice to have, not a correctness requirement)
+                //
+                // Analogous to: you confirm a hotel booking, THEN send the confirmation
+
+                try
+                {
+                    var orderConfirmedEvent = new OrderConfirmedEvent(
+                OrderId: order.Id,
+                UserId: order.UserId,
+                ProductName: product.Name,
+                Quantity: order.Quantity,
+                TotalPrice: order.TotalPrice,
+                ConfirmedAt: DateTime.UtcNow
+            );
+
+                    await _eventBus.PublishAsync(orderConfirmedEvent);
+
+                    _logger.LogInformation(
+                "OrderConfirmedEvent published for Order {OrderId}", order.Id);
+
+                }
+
+
+                catch(Exception ex)
+                {
+
+
+
+                    //Log a WARNING and SWALLOW the exception.
+                    // We DO NOT rethrow. This is deliberate.  
+                    // The order is already committed to PostgreSQL  The customer's purchase is valid and real.  
+                    // Rethrowing would cause the controller to return HTTP 500,
+                    // making the customer think the checkout FAILED when it  
+                    // actually SUCCEEDED — the worst possible user experience. 
+
+                    // By logging a Warning (not Error), we:                   
+                    //   1. Signal the team that invoicing may be delayed       
+                    //   2. Provide enough info to manually re-send the event  
+                    //   3. Never disrupt the customer's experience
+                    //   
+                    // In production, I would implement the Transactional     
+            // Outbox Pattern to guarantee zero message loss.          
+
+                    _logger.LogWarning(                                    
+                ex,                                                
+                "Failed to publish OrderConfirmedEvent for Order {OrderId}. " + 
+                "Order is still valid in the database. " +         
+                "Invoice generation may be delayed.",             
+                order.Id);
+
+
+                }
+
+
+
+                // // ── STEP 11: Map Order entity → OrderDto ──
 
                 var dto = _mapper.Map<OrderDto>(order);
                 dto.ProductName = product.Name;

@@ -42,7 +42,7 @@ namespace FlashDrop.API.Modules.Ordering.Events
 
          //TotalPrice — the final price paid.
         // This is the snapshot price (Price × Quantity) stored in Order.TotalPrice.
-        decimal ToatlPrice ,
+        decimal TotalPrice ,
 
         DateTime ConfirmedAt
 
