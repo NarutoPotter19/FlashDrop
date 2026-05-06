@@ -193,6 +193,31 @@ try
 
     builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
+    // Register IEventBus as Singleton
+    //
+    // AddSingleton<IEventBus, RabbitMqEventBus>():
+    //
+    // WHY Singleton?
+    //   RabbitMqEventBus holds a persistent AMQP connection (_connection)
+    //   and a channel (_channel). These are expensive to create (TCP handshake,
+    //   AMQP negotiation). Creating one per request (Scoped) would be:
+    //     - Slow: each request opens and closes a TCP connection
+    //     - Wasteful: RabbitMQ has connection limits (~100 by default)
+    //   Singleton: ONE connection shared across all requests for the app lifetime.
+    //
+    // WHY placed here (after Redis, before authentication)?
+    //   No strict ordering requirement. Placed near ICacheService by convention
+    //   (both are shared infrastructure services).
+    //
+    // STARTUP SIDE EFFECT:
+    //   When DI resolves RabbitMqEventBus for the first time (at Build()),
+    //   the constructor runs — which tries to connect to RabbitMQ.
+    //   If RabbitMQ is not running, the retry loop runs (3 attempts, 2s delay).
+    //   If all 3 attempts fail, the app throws and refuses to start.
+    //   This is intentional — the app requires RabbitMQ to function.
+
+    builder.Services.AddSingleton<IEventBus, RabbitMqEventBus>();
+
 
 
 
