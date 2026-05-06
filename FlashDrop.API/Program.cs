@@ -157,6 +157,19 @@ try
         => cfg.RegisterServicesFromAssembly(
             Assembly.GetExecutingAssembly()));
 
+
+
+    // IHttpContextAccessor provides access to HttpContext (and thus
+    // HttpContext.User.Claims) from classes that are NOT controllers —
+
+    // WHY Singleton? HttpContextAccessor itself is thread-safe — it stores
+    // a reference to the current HttpContext via AsyncLocal<T>, which is
+    // inherently scoped to the current async execution context. Multiple
+    // handlers on different requests each see their own HttpContext.
+    builder.Services.AddHttpContextAccessor();
+
+
+
     builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
   
 
