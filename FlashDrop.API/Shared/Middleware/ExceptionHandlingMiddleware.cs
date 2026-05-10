@@ -9,6 +9,8 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using static System.Net.WebRequestMethods;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
+using Microsoft.EntityFrameworkCore;//For  DbUpdateConcurrencyException
+
 namespace FlashDrop.API.Shared.Middleware
 {
 
@@ -93,6 +95,13 @@ namespace FlashDrop.API.Shared.Middleware
                 OutOfStockException =>
                     (HttpStatusCode.Conflict, "Conflict", null),
 
+                DbUpdateConcurrencyException=> 
+                ((HttpStatusCode)409, "Conflict",
+              null),
+
+
+
+
                 //  Task: EVERYTHING ELSE → 500
                 // Unexpected bugs, null reference exceptions, database failures, etc.
                 // We don't expose internal details to the client (security risk).
@@ -117,10 +126,18 @@ namespace FlashDrop.API.Shared.Middleware
 
                 //Task: "detail" — the specific exception message.
                 // For 500 errors we hide the real message and show generic text.
-                Detail = exception is NotFoundException or Shared.Exceptions.ValidationException or OutOfStockException
-                    ? exception.Message
-                    : "An unexpected error occurred. Please try again later.",
 
+                //i have used this Detail before Adding DBUpdateCOncurencyException it was working but for 
+                //started facing some error so for coustome message to get executed i have made used below one 
+                //Detail = exception is NotFoundException or Shared.Exceptions.ValidationException or OutOfStockException or  DbUpdateConcurrencyException
+                //    ? exception.Message
+                //    : "An unexpected error occurred. Please try again later.",
+                Detail = exception switch
+                {
+                    DbUpdateConcurrencyException => "This item was updated by another request. Please try again.",
+                    NotFoundException or Shared.Exceptions.ValidationException or OutOfStockException => exception.Message,
+                    _ => "An unexpected error occurred. Please try again later."
+                },
                 //  Task: "instance" — the URL path that caused the error.
                 // Helps the client know which endpoint was called.
                 Instance = context.Request.Path
