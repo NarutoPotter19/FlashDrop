@@ -66,8 +66,8 @@ namespace FlashDrop.API.Modules.Catalog.Commands
             RuleFor(x => x.Name)
                 .NotEmpty()
                 .WithMessage("Name is Required")
-                .MaximumLength(20)
-                .WithMessage("Name must not exceed 20 characters");
+                .MaximumLength(30)
+                .WithMessage("Name must not exceed 30 characters");
 
 
             //Sku validation

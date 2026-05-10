@@ -348,7 +348,18 @@ try
 
 
 
+    //For testing concurency testing endpoint which use HttpCLient 
+    //Register IHttpClientFactory
+// Required by OrderController.FlashSaleTest for proper HttpClient lifecycle.
+// Place this near builder.Services.AddControllers():
+builder.Services.AddHttpClient();
 
+    // WHY AddHttpClient() instead of new HttpClient()?
+    //   HttpClient is meant to be long-lived and shared (it pools connections).
+    //   new HttpClient() per request = socket exhaustion under load (thousands of 
+    //   TIME_WAIT sockets that can't be reused for minutes).
+    //   IHttpClientFactory manages a pool of HttpMessageHandler instances and
+    //   rotates them to avoid DNS stale issues. Industry best practice.
 
 
 
