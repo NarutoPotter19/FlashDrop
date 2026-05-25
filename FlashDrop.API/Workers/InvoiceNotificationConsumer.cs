@@ -388,29 +388,22 @@ Inside the callback, we can still do synchronous work (deserialization, logging)
 
             try
             {
-                //check if both the channel or connection are open or not 
-                //if they are open then close it 
-
                 if (_channel is { IsOpen: true })
                     _channel.Close();
 
                 if (_connection is { IsOpen: true })
                     _connection.Close();
-
             }
-
-            catch{
-
+            catch (Exception ex)
+            {
                 _logger.LogWarning(ex,
-               "InvoiceNotificationConsumer: Exception during RabbitMQ disposal.");
-
+                    "InvoiceNotificationConsumer: Exception during RabbitMQ disposal.");
             }
-
-            finally{
+            finally
+            {
                 _channel?.Dispose();
                 _connection?.Dispose();
                 base.Dispose();
-
             }
         }
 
