@@ -23,6 +23,14 @@ using FlashDrop.API.Shared.Services;//we are going to use IChace service and Red
 
 using FlashDrop.API.Shared.Data;// for databse seeder abd flashdbcontext which we going to register in here for database seeding at startup of the APPLICATION
 
+using FlashDrop.API.Workers;//for InvoiceNotifiacationConsumer( rabit MQ consumer service registration )
+
+
+using Microsoft.Extensions.Diagnostics.HealthChecks; // this is for healthStatus and HealthReport
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using RabbitMQ.Client;
+using System.Text.Json; // this is for HealthCheckOption
+
 
 
 // 1. BOOTSTRAP LOGGER (Catches crashes before the app even fully starts)
@@ -44,7 +52,7 @@ try
     );
 
     // ==========================================
-    // PROMPT 6 TO 50: ADD ALL SERVICES HERE
+   // Adding ALL SERVICES HERE
     // ==========================================
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
@@ -102,18 +110,18 @@ try
         options.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
             {
-                new OpenApiSecurityScheme                               // [+]
-            {                                                        // [+]
-                Reference = new OpenApiReference                    // [+]
-                {                                                    // [+]
+                new OpenApiSecurityScheme                             
+            {                                                      
+                Reference = new OpenApiReference                   
+                {                                                  
                     // [+] ReferenceType.SecurityScheme: we are referencing
                     //     a security scheme (not a path, component, etc.)
-                    Type = ReferenceType.SecurityScheme,            // [+]
-                                                                    // [+]
+                    Type = ReferenceType.SecurityScheme,            
+                                                                
                     // [+] Id "Bearer": MUST exactly match the name used in
                     //     AddSecurityDefinition above. Case-sensitive.
-                    Id = "Bearer"                                   // [+]
-                }                                                    // [+]
+                    Id = "Bearer"                               
+                }                                                 
             },
                 Array.Empty<string>() // No scopes required for Bearer/JWT
             }
@@ -230,6 +238,19 @@ try
     //   This is intentional — the app requires RabbitMQ to function.
 
     builder.Services.AddSingleton<IEventBus, RabbitMqEventBus>();
+
+
+
+    //==>Addding/Registing InvoiceNotificationConsumer
+    // AddHostedService<T>() registers InvoiceNotificationConsumer as an
+    // IHostedService. The .NET host:
+    //   1. Creates the instance when app starts (DI injects IConfiguration + ILogger)
+    //   2. Calls StartAsync() → ExecuteAsync() runs in background thread
+    //   3. Keeps it running alongside the HTTP server
+    //   4. Calls StopAsync() → triggers stoppingToken cancellation → ExecuteAsync exits
+    //
+    // Transient-like lifetime: one instance for the app's lifetime.
+    builder.Services.AddHostedService<InvoiceNotificationConsumer>();
 
 
 
@@ -365,6 +386,42 @@ builder.Services.AddHttpClient();
 
 
 
+    // COnfigure HealthCheck Segment 
+
+    var pgConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    var reddisConnectionString = builder.Configuration.GetConnectionString("Redis");
+
+    //// [+] Build RabbitMQ ConnectionFactory for the health check.
+    // HealthChecks.Rabbitmq needs a factory (or IConnection) to verify the broker.
+
+    //var rabbitFactory = new ConnectionFactory
+    //{
+    //    HostName = builder.Configuration["RabbitMQ:Host"] ?? "localhost",
+    //    UserName = builder.Configuration["RabbitMQ: UserName"] ?? "guest",
+    //    Password = builder.Configuration["RabbitMQ:Password"] ?? "guest"
+
+    //};
+
+    var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+    var rabbitUser = builder.Configuration["RabbitMQ: UserName"] ?? "guest"; // Kept your exact spelling
+    var rabbitPass = builder.Configuration["RabbitMQ:Password"] ?? "guest";
+
+
+    var rabbitConnectionString = $"amqp://{rabbitUser}:{rabbitPass}@{rabbitHost}:5672";
+
+    builder.Services.AddHealthChecks()
+        .AddNpgSql(pgConnectionString, name: "npgsql", tags: new[] { "db" })// opens PostgreSQL connection, runs SELECT 1
+        .AddRedis(reddisConnectionString, name: "reddis", tags: new[] { "cache" })//sends PING command to Redis, checks response
+        .AddRabbitMQ(rabbitConnectionString, name: "RabbitMq", tags: new[] { "Messaging" });
+    //.AddRabbitMQ(rabbitConnectionFactory: sp => rabbitFactory, name: "RabbitMq", tags: new[] { "Messaging" });//opens AMQP connection to RabbitMQ broker
+    // .AddRabbitMQ(rabbitFactory, name: "RabbitMq", tags: new[] { "Messaging" });
+
+
+
+
+
+
+
 
     var app = builder.Build();
 
@@ -412,6 +469,48 @@ builder.Services.AddHttpClient();
     await DatabaseSeeder.SeedAsync(app.Services);
 
 
+
+
+    //HealthCheking : mapping HealthCheck
+
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResultStatusCodes = new Dictionary<HealthStatus, int>
+        {
+            [HealthStatus.Healthy] = StatusCodes.Status200OK,
+            [HealthStatus.Degraded] = StatusCodes.Status200OK,
+            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+        },
+
+
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+
+            var result = new
+            {
+                status = report.Status.ToString(),
+                totalDuration = report.TotalDuration.ToString(),
+                entries = report.Entries.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new
+                {
+                    status = kvp.Value.Status.ToString(),
+                    duration = kvp.Value.Duration.ToString(),
+                    description = kvp.Value.Description 
+                })
+
+            };
+            await context.Response.WriteAsync(                                                     
+                        JsonSerializer.Serialize(result, new JsonSerializerOptions                        
+                        {                                                                              
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,                          
+                            WriteIndented = true                                                    
+                        }));
+        }
+    });
+
+
     ////Testing :
     ///TEMPORARY — DELETE AFTER TESTING reesponse should be 401 unauthorise d
     //app.MapGet("/test-auth", [Microsoft.AspNetCore.Authorization.Authorize] () =>
@@ -427,6 +526,12 @@ builder.Services.AddHttpClient();
         var result = await cache.GetAsync<object>("test-key");
         return Results.Ok(result);
     });
+
+
+
+
+
+
 
 
     app.Run();
