@@ -1,13 +1,24 @@
-# FlashDrop API — Docker Compose Infrastructure
-# Prompt 9:  Redis added
-# Prompt 29: RabbitMQ added
-# Note: PostgreSQL is running externally/locally and managed via pgAdmin.
+version: '3.8'
 
 services:
 
-  # ──────────────────────────────────────────────────────────
-  # REDIS — In-memory cache for Product Catalog
-  # ──────────────────────────────────────────────────────────
+  # Primary database for Users, Products, Orders
+  db:
+    image: postgres:16
+    container_name: flashdrop-postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: flashdrop
+      POSTGRES_USER: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persists database data across container restarts. 
+      # Run 'docker compose down -v' to completely wipe this data.
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Cache-Aside pattern for Product catalog
   redis:
     image: redis:7-alpine
     container_name: flashdrop-redis
@@ -15,18 +26,53 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-  # ──────────────────────────────────────────────────────────
-  # RABBITMQ — Message Broker for Events
-  # ──────────────────────────────────────────────────────────
+  # Message broker for background events (e.g., OrderConfirmed)
   rabbitmq:
     image: rabbitmq:3-management
     container_name: flashdrop-rabbitmq
     ports:
-      # AMQP protocol port — your .NET app connects here to publish/consume
       - "5672:5672"
-      # Management UI — open http://localhost:15672 in browser
-      - "15672:15672"
+      - "15672:15672" # Management UI port
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     restart: unless-stopped
+
+  # FlashDrop .NET 9 Web API
+  api:
+    build:
+      context: ./FlashDrop.API
+      dockerfile: Dockerfile
+    container_name: flashdrop-api
+    ports:
+      # Maps your local Windows port (5216) to the container's internal port (8080)
+      - "5216:8080"
+    depends_on:
+      # Ensures Docker starts infrastructure containers before starting the API
+      - db
+      - redis
+      - rabbitmq
+    environment:
+      # --- Docker Network Overrides ---
+      # In Docker Compose, containers communicate via their exact service names.
+      # We override the appsettings.json 'localhost' with 'db', 'redis', and 'rabbitmq'.
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=flashdrop;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis:6379
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+
+      # --- Security & JWT ---
+      - JwtSettings__Secret=FlashDropSuperSecretKeyThatIsAtLeast32CharsLongForHS256!
+      - JwtSettings__Issuer=FlashDrop.Api
+      - JwtSettings__Audience=FlashDrop.Client
+      - JwtSettings__ExpiryMinutes=60
+
+      # --- Environment Setup ---
+      # Change this to 'Development' if you want the Swagger UI to be visible
+      - ASPNETCORE_ENVIRONMENT=Production
+    restart: unless-stopped
+
+volumes:
+  # Docker manages this volume to prevent data loss when containers stop
+  postgres_data:
