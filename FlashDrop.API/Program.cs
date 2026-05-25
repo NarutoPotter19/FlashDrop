@@ -471,7 +471,9 @@ builder.Services.AddHttpClient();
 
 
 
-    //HealthCheking : mapping HealthCheck
+    //HealthCheking : mapping HealthCheck with rreposne writer this will give use a custom json response ,
+    //when we hit the /health endpoint and also we are mapping the health status code with our custom status code,
+    //for each health status like healthy and degraded will return 200 ok but unhealthy will return 503 service unavailable
 
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
