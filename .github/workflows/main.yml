@@ -1,0 +1,40 @@
+# FlashDrop API — GitHub Actions CI Pipeline
+# Runs on every push to main and every pull request targeting main.
+# Ensures the project always builds cleanly before merging.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+# ---------------------- Jobs ----------------------
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup .NET SDK
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Restore NuGet packages
+      - name: Restore NuGet packages
+        run: dotnet restore FlashDrop.API/FlashDrop.API.csproj
+
+      # Build
+      - name: Build
+        run: dotnet build FlashDrop.API/FlashDrop.API.csproj --no-restore -c Release
+
+      # Test
+      - name: Test
+        run: dotnet test FlashDrop.API/FlashDrop.API.csproj --no-build -c Release --verbosity minimal
